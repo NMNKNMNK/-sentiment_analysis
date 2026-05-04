@@ -10,7 +10,7 @@ app = FastAPI()
 HF_TOKEN = os.environ.get("HF_TOKEN")
 # より安定している 'small' モデルに変更してみます
 STT_API_URL = "https://api-inference.huggingface.co/models/openai/whisper-small"
-SENTIMENT_API_URL = "https://api-inference.huggingface.co/models/google/gemma-3-270m"
+SENTIMENT_API_URL = "https://api-inference.huggingface.co/models/finmigodeveloper/gemma-3-270m-transaction-lora"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 def query_stt(filename):
