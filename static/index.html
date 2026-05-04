@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Sentiment AI</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h1 { color: #333; font-size: 1.5rem; margin-bottom: 1.5rem; }
+        .btn { background-color: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 30px; font-size: 1rem; cursor: pointer; transition: background 0.3s; width: 100%; }
+        .btn:hover { background-color: #0056b3; }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn.recording { background-color: #dc3545; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        .result-box { margin-top: 20px; padding: 15px; border-radius: 8px; background: #f9f9f9; display: none; text-align: left; }
+        .sentiment-tag { font-weight: bold; display: inline-block; padding: 2px 8px; border-radius: 4px; margin-top: 5px; }
+        .positive { background-color: #d4edda; color: #155724; }
+        .negative { background-color: #f8d7da; color: #721c24; }
+        .neutral { background-color: #e2e3e5; color: #383d41; }
+        .loading { font-size: 0.9rem; color: #666; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>感情分析AI (Gemma 3)</h1>
+    <button id="recordBtn" class="btn">録音開始</button>
+    <div id="loading" class="loading">解析中... (3〜10秒ほどかかります)</div>
+
+    <div id="resultBox" class="result-box">
+        <strong>聞き取った内容:</strong>
+        <p id="transcript" style="margin: 5px 0 15px 0; font-size: 0.9rem;"></p>
+        <strong>分析結果:</strong><br>
+        <span id="sentimentTag" class="sentiment-tag"></span>
+    </div>
+</div>
+
+<script>
+    let mediaRecorder;
+    let audioChunks = [];
+    const recordBtn = document.getElementById('recordBtn');
+    const resultBox = document.getElementById('resultBox');
+    const transcriptText = document.getElementById('transcript');
+    const sentimentTag = document.getElementById('sentimentTag');
+    const loading = document.getElementById('loading');
+
+    recordBtn.addEventListener('click', async () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            // 録音停止
+            mediaRecorder.stop();
+            recordBtn.textContent = "録音開始";
+            recordBtn.classList.remove('recording');
+            recordBtn.disabled = true;
+        } else {
+            // 録音開始
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                await sendAudioToServer(audioBlob);
+            };
+
+            mediaRecorder.start();
+            recordBtn.textContent = "録音を停止して分析";
+            recordBtn.classList.add('recording');
+            resultBox.style.display = "none";
+        }
+    });
+
+    async function sendAudioToServer(blob) {
+        loading.style.display = "block";
+        const formData = new FormData();
+        formData.append('file', blob, 'recording.wav');
+
+        try {
+            const response = await fetch('/analyze-audio', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                transcriptText.textContent = data.text;
+                sentimentTag.textContent = data.sentiment;
+                
+                // 感情に合わせて色を変える
+                sentimentTag.className = 'sentiment-tag';
+                const s = data.sentiment.toLowerCase();
+                if (s.includes('positive')) sentimentTag.classList.add('positive');
+                else if (s.includes('negative')) sentimentTag.classList.add('negative');
+                else sentimentTag.classList.add('neutral');
+
+                resultBox.style.display = "block";
+            } else {
+                alert("エラーが発生しました: " + data.detail);
+            }
+        } catch (error) {
+            alert("通信エラーが発生しました。");
+            console.error(error);
+        } finally {
+            loading.style.display = "none";
+            recordBtn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
